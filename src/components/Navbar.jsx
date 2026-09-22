@@ -4,7 +4,7 @@ import Link from "next/link";
 import { Menu, X } from "lucide-react";
 import { useState } from "react";
 import { usePathname } from "next/navigation";
-
+import Image from "next/image";
 export default function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -46,28 +46,22 @@ export default function Navbar() {
   ];
 
   return (
-    <header className="sticky top-0 z-50 border-b border-green-100 bg-white/90 backdrop-blur-xl shadow-sm">
+    <header className="sticky top-0 z-50 border-b border-[#F1DDD1] bg-white/90 backdrop-blur-xl shadow-sm">
 
       <div className="container-custom flex h-20 items-center justify-between">
 
         {/* Logo */}
 
         <Link href={makeLink("/")}>
-
-          <h1 className="text-2xl font-black tracking-tight">
-
-            <span className="text-green-600">
-              Central
-            </span>
-
-            <span className="text-slate-900">
-              {" "}Biomedicals
-            </span>
-
-          </h1>
-
+          <Image
+            src="/logo.png"
+            alt="Raj Biosis"
+            width={90}
+            height={35}
+            priority
+            className="h-auto w-[70px] md:w-[90px] object-contain"
+          />
         </Link>
-
         {/* Desktop Menu */}
 
         <nav className="hidden items-center gap-8 lg:flex">
@@ -77,7 +71,7 @@ export default function Navbar() {
             <Link
               key={link.name}
               href={makeLink(link.path)}
-              className="relative font-medium text-slate-700 transition duration-300 hover:text-green-600 after:absolute after:left-0 after:-bottom-1 after:h-[2px] after:w-0 after:bg-green-600 after:transition-all hover:after:w-full"
+              className="relative font-medium text-slate-700 transition duration-300 hover:text-[#A45F35] after:absolute after:left-0 after:-bottom-1 after:h-[2px] after:w-0 after:bg-[#A45F35] after:transition-all hover:after:w-full"
             >
               {link.name}
             </Link>
@@ -92,7 +86,7 @@ export default function Navbar() {
 
           <Link href={makeLink("/contact")}>
 
-            <button className="rounded-xl bg-green-600 px-6 py-3 font-semibold text-white transition hover:bg-green-700 hover:shadow-lg hover:shadow-green-200">
+            <button className="rounded-xl bg-[#A45F35] px-6 py-3 font-semibold text-white transition hover:bg-[#874723] hover:shadow-lg hover:shadow-[#E8C8B6]">
 
               Get Quote
 
@@ -106,18 +100,18 @@ export default function Navbar() {
 
         <button
           onClick={() => setMenuOpen(!menuOpen)}
-          className="rounded-xl border border-green-100 p-2 transition hover:bg-green-50 lg:hidden"
+          className="rounded-xl border border-[#F1DDD1] p-2 transition hover:bg-[#F8EEE8] lg:hidden"
         >
 
           {menuOpen ? (
             <X
               size={26}
-              className="text-green-600"
+              className="text-[#A45F35]"
             />
           ) : (
             <Menu
               size={26}
-              className="text-green-600"
+              className="text-[#A45F35]"
             />
           )}
 
@@ -132,7 +126,7 @@ export default function Navbar() {
           }`}
       >
 
-        <div className="border-t border-green-100 bg-white px-6 py-6">
+        <div className="border-t border-[#F1DDD1] bg-white px-6 py-6">
 
           <nav className="flex flex-col gap-5">
 
@@ -142,7 +136,7 @@ export default function Navbar() {
                 key={link.name}
                 href={makeLink(link.path)}
                 onClick={() => setMenuOpen(false)}
-                className="font-medium text-slate-700 transition hover:text-green-600"
+                className="font-medium text-slate-700 transition hover:text-[#A45F35]"
               >
 
                 {link.name}
@@ -156,7 +150,7 @@ export default function Navbar() {
               onClick={() => setMenuOpen(false)}
             >
 
-              <button className="mt-2 w-full rounded-xl bg-green-600 py-3 font-semibold text-white transition hover:bg-green-700">
+              <button className="mt-2 w-full rounded-xl bg-[#A45F35] py-3 font-semibold text-white transition hover:bg-[#874723]">
 
                 Get Quote
 

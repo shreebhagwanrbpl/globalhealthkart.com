@@ -12,7 +12,7 @@ export default function SectionTitle({
 
       {/* Badge */}
       {badge && (
-        <div className="mb-5 inline-flex items-center rounded-full border border-green-200 bg-green-100 px-5 py-2 text-sm font-semibold text-green-700 shadow-sm">
+        <div className="mb-5 inline-flex items-center rounded-full border border-[#E8C8B6] bg-[#F1DDD1] px-5 py-2 text-sm font-semibold text-[#874723] shadow-sm">
           {badge}
         </div>
       )}

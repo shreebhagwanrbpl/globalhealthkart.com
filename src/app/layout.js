@@ -5,17 +5,17 @@ import { Toaster } from "react-hot-toast";
 
 export const metadata = {
   metadataBase: new URL(
-    "https://centralbiomedicals.com"
+    "https://globalhealthkart.com"
   ),
 
   title:
-    "Biomedical Equipment Supplier in India | Central Biomedicals",
+    "Raj Biosis | Biomedical Equipment Supplier in India | Raj Biosis",
 
   description:
-    "Central Biomedicals supplies CBC Machines, Hematology Analyzers, Biochemistry Analyzers, ELISA Readers and laboratory equipment across India.",
+    "Raj Biosis supplies CBC Machines, Hematology Analyzers, Biochemistry Analyzers, ELISA Readers and laboratory equipment across India.",
 
   keywords: [
-    "Biomedical Equipment Supplier",
+    "Raj Biosis | Biomedical Equipment Supplier",
     "Laboratory Equipment Supplier",
     "CBC Machine Supplier",
     "Hematology Analyzer Supplier",
@@ -26,21 +26,21 @@ export const metadata = {
 
   openGraph: {
     title:
-      "Biomedical Equipment Supplier in India | Central Biomedicals",
+      "Raj Biosis | Biomedical Equipment Supplier in India | Raj Biosis",
 
     description:
       "Supplier of biomedical and laboratory equipment across India.",
 
-    url: "https://centralbiomedicals.com",
+    url: "https://globalhealthkart.com",
 
-    siteName: "Central Biomedicals",
+    siteName: "Raj Biosis",
 
     images: [
       {
         url: "/logo.png",
         width: 1200,
         height: 630,
-        alt: "Central Biomedicals",
+        alt: "Raj Biosis",
       },
     ],
 
@@ -52,7 +52,7 @@ export const metadata = {
     card: "summary_large_image",
 
     title:
-      "Biomedical Equipment Supplier in India | Central Biomedicals",
+      "Raj Biosis | Biomedical Equipment Supplier in India | Raj Biosis",
 
     description:
       "Supplier of biomedical and laboratory equipment across India.",
@@ -61,7 +61,7 @@ export const metadata = {
   },
 
   alternates: {
-    canonical: "https://centralbiomedicals.com",
+    canonical: "https://globalhealthkart.com",
   },
 };
 
@@ -70,7 +70,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className="antialiased">
+      <body className="antialiased bg-[#FCF8F5] text-[#3B2118]">
         <Navbar />
 
         <main>

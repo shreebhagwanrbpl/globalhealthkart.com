@@ -1,6 +1,6 @@
 {
   "apphosting": {
-    "backendId": "centralbiomedicals",
+    "backendId": "globalhealthkartcom",
     "rootDir": "/",
     "ignore": [
       "node_modules",
@@ -8,6 +8,7 @@
       "firebase-debug.log",
       "firebase-debug.*.log",
       "functions"
-    ]
+    ],
+    "alwaysDeployFromSource": true
   }
 }
