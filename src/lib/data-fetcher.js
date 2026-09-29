@@ -1,268 +1,220 @@
-import { db } from "./firebase.js";
 import {
-  doc,
-  getDoc,
-  getDocs,
-  collection,
-} from "firebase/firestore";
-import {
-  CURRENT_COMPANY_ID,
-  CURRENT_WEBSITE_ID,
-  WEBSITE_CONFIG,
-  isItemVisible,
+  makeSlug,
+  normalizeSlug,
   normalizeDomainId,
-} from "./constants.js";
+  isItemVisibleOnWebsite,
+  normalizeProduct,
+  WEBSITE_ID,
+} from "./catalog-utils.js";
 
-export const makeSlug = (text = "") =>
-  String(text || "")
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9\s-]/g, "")
-    .replace(/\s+/g, "-");
+export { makeSlug, normalizeSlug, normalizeDomainId, isItemVisibleOnWebsite, normalizeProduct, WEBSITE_ID };
+export const normalizeSiteId = normalizeDomainId;
+export const isVisibleOnWebsite = isItemVisibleOnWebsite;
 
-// Document cache with short TTL (5 seconds) to prevent redundant simultaneous reads during SSR
-// while avoiding locking stale visibility states
-const docCache = {};
-let inFlightCatalogPromise = null;
-let lastCatalogFetchTime = 0;
-let lastCatalogData = null;
-const SSR_CACHE_TTL_MS = 2000; // 2 seconds max during render burst
+let clientCatalogCache = null;
+let clientCatalogPromise = null;
+let lastCatalogFetch = 0;
+const CLIENT_CACHE_TTL = 15000; // 15 seconds
 
 /**
- * Fetch a single document with short TTL cache.
+ * Fetch full catalog for client or server components
  */
-export async function fetchDocCached(path, forceFresh = false) {
-  const now = Date.now();
-  if (!forceFresh && docCache[path] && now - docCache[path].time < SSR_CACHE_TTL_MS) {
-    return docCache[path].data;
+export async function fetchFullCatalog(options = {}) {
+  if (typeof window === "undefined") {
+    const { fetchFullCatalog: fetchServerCatalog } = await import("./db-server.js");
+    return await fetchServerCatalog(options);
   }
 
-  try {
-    const parts = path.split("/").filter(Boolean);
-    const docRef = doc(db, ...parts);
-    const snap = await getDoc(docRef);
-    if (snap.exists()) {
-      const data = snap.data();
-      docCache[path] = { data, time: now };
-      return data;
-    }
-    return null;
-  } catch (err) {
-    console.error(`Error fetching doc at ${path}:`, err);
-    throw err;
-  }
+  const data = await fetchFullCatalogData();
+  return data?.categoryProducts || data?.products || [];
 }
 
 /**
- * Normalizes a single product object from Firestore into standard frontend shape
+ * Fetch catalog data with categories hierarchy
  */
-function normalizeProductShape(prod, categoryName, subCategoryName, uniqueId) {
-  const title = prod.title || prod.name || "Untitled Product";
-  const desc = prod.desc || prod.description || "";
-  const rawImages = Array.isArray(prod.images)
-    ? prod.images
-    : prod.image
-    ? [prod.image]
-    : [];
-  
+export async function fetchFullCatalogData() {
+  if (typeof window === "undefined") {
+    const { fetchFullCatalogData: fetchServerCatalog } = await import("./db-server.js");
+    return await fetchServerCatalog();
+  }
+
+  const now = Date.now();
+  if (clientCatalogCache && now - lastCatalogFetch < CLIENT_CACHE_TTL) {
+    return clientCatalogCache;
+  }
+
+  if (clientCatalogPromise) {
+    return clientCatalogPromise;
+  }
+
+  clientCatalogPromise = (async () => {
+    try {
+      const res = await fetch("/api/catalog", { cache: "no-store" });
+      if (!res.ok) {
+        throw new Error(`Failed to fetch catalog: ${res.status}`);
+      }
+      const data = await res.json();
+      clientCatalogCache = data;
+      lastCatalogFetch = Date.now();
+      return data;
+    } catch (err) {
+      console.error("[data-fetcher] Error in fetchFullCatalogData:", err);
+      return { categoryProducts: [], categoryList: [], products: [] };
+    } finally {
+      clientCatalogPromise = null;
+    }
+  })();
+
+  return clientCatalogPromise;
+}
+
+export async function getCategoriesData() {
+  const data = await fetchFullCatalogData();
   return {
-    ...prod,
-    id: prod.id || prod.categoryProductId || uniqueId,
-    uid: uniqueId,
-    categoryProductId: prod.categoryProductId || prod.id || uniqueId,
-    title,
-    name: title,
-    slug: prod.slug || makeSlug(title),
-    price: prod.price || "",
-    desc,
-    description: desc,
-    capacity: prod.capacity || "",
-    throughput: prod.throughput || "",
-    instrument: prod.instrument || "",
-    model: prod.model || "",
-    usage: prod.usage || "",
-    brand: prod.brand || WEBSITE_CONFIG.companyName || "",
-    parameters: prod.parameters || "",
-    automation: prod.automation || "",
-    availability: prod.availability || "",
-    size: prod.size || "",
-    category: categoryName || prod.category || "General Category",
-    subCategory: subCategoryName || prod.subCategory || prod.subcategory || "General",
-    images: rawImages,
-    originalImages: prod.originalImages || rawImages,
-    image: rawImages[0] || "",
-    video: prod.video || "",
-    pdf: prod.pdf || "",
-    isPublished: prod.isPublished !== false,
-    websiteIds: Array.isArray(prod.websiteIds) ? prod.websiteIds : [],
-    companyId: prod.companyId || CURRENT_COMPANY_ID,
+    categoryList: data?.categoryList || [],
+    categoryProducts: data?.categoryProducts || data?.products || [],
   };
 }
 
+export async function getProductBySlug(slug) {
+  if (!slug) return null;
+  const products = await fetchFullCatalog();
+  const target = normalizeSlug(slug);
+  return (
+    products.find(
+      (p) =>
+        normalizeSlug(p.slug) === target ||
+        normalizeSlug(p.id) === target ||
+        normalizeSlug(p.categoryProductId) === target
+    ) || null
+  );
+}
+
 /**
- * Fetch Full Catalog from Master Catalog:
- * Path: companies/{companyId}/categories/{categoryId}/subcategories/{subcategoryId}
- * 
- * Bulletproof Cascading Visibility:
- * 1. Category check: If category is hidden -> Skip all its subcategories and products.
- * 2. Subcategory check: If subcategory is hidden -> Skip all its products.
- * 3. Product check: If product is hidden (isPublished === false or not in websiteIds) -> Skip product.
+ * Fetch Home Page Data
  */
-export async function fetchMasterCompanyCatalog(
-  companyId = CURRENT_COMPANY_ID,
-  websiteId = CURRENT_WEBSITE_ID
-) {
-  const startTime = performance.now();
-  const allProducts = [];
+export async function fetchHomeData() {
+  if (typeof window === "undefined") {
+    const { getHomeData } = await import("./db-server.js");
+    return await getHomeData();
+  }
 
   try {
-    // 1. Query Master Categories for the company
-    const categoriesCol = collection(db, "companies", companyId, "categories");
-    const categorySnap = await getDocs(categoriesCol);
-
-    // Process all categories in parallel
-    await Promise.all(
-      categorySnap.docs.map(async (categoryDoc) => {
-        const catData = categoryDoc.data();
-        const catId = categoryDoc.id;
-        const categoryName = catData.name || catData.category || catId;
-
-        // ====================================================
-        // CASCADE STEP 1: Check Category Visibility
-        // If Category is hidden -> immediately skip all subcategories & products!
-        // ====================================================
-        if (!isItemVisible(catData, websiteId)) {
-          return;
-        }
-
-        try {
-          // 2. Query Subcategories for this visible category
-          const subcategoriesCol = collection(
-            db,
-            "companies",
-            companyId,
-            "categories",
-            catId,
-            "subcategories"
-          );
-          const subcategoriesSnap = await getDocs(subcategoriesCol);
-
-          subcategoriesSnap.docs.forEach((subDoc) => {
-            const subData = subDoc.data();
-            const subId = subDoc.id;
-            const subCategoryName = subData.name || subData.subCategory || subId;
-
-            // ====================================================
-            // CASCADE STEP 2: Check Subcategory Visibility
-            // If Subcategory is hidden -> immediately skip all products!
-            // ====================================================
-            if (!isItemVisible(subData, websiteId)) {
-              return;
-            }
-
-            // ====================================================
-            // CASCADE STEP 3: Check Product Visibility
-            // Read products from subData.products array
-            // ====================================================
-            const rawProducts = Array.isArray(subData.products) ? subData.products : [];
-            
-            rawProducts.forEach((prod, index) => {
-              if (isItemVisible(prod, websiteId)) {
-                const uid = `${catId}-${subId}-${prod.id || index}`;
-                allProducts.push(
-                  normalizeProductShape(prod, categoryName, subCategoryName, uid)
-                );
-              }
-            });
-          });
-        } catch (subErr) {
-          console.error(`Error fetching subcategories for category ${catId}:`, subErr);
-        }
-
-        // Direct category products (if any)
-        if (Array.isArray(catData.products) && catData.products.length > 0) {
-          catData.products.forEach((prod, index) => {
-            if (isItemVisible(prod, websiteId)) {
-              const uid = `${catId}-direct-${prod.id || index}`;
-              allProducts.push(
-                normalizeProductShape(prod, categoryName, prod.subCategory || categoryName, uid)
-              );
-            }
-          });
-        }
-      })
-    );
-
-    const duration = performance.now() - startTime;
-    console.log(
-      `[data-fetcher] Master Catalog fetched: ${allProducts.length} visible product(s) for company "${companyId}" / website "${websiteId}" in ${duration.toFixed(1)}ms`
-    );
-
-    return allProducts;
+    const res = await fetch("/api/site-data?type=home", { cache: "no-store" });
+    if (!res.ok) return null;
+    const json = await res.json();
+    return json?.data || json || null;
   } catch (err) {
-    console.error(`[data-fetcher] Error fetching master catalog for company ${companyId}:`, err);
+    console.error("[data-fetcher] Error fetching home data:", err);
+    return null;
+  }
+}
+
+/**
+ * Fetch Services Data
+ */
+export async function fetchServicesData() {
+  if (typeof window === "undefined") {
+    const { getServicesData } = await import("./db-server.js");
+    return await getServicesData();
+  }
+
+  try {
+    const res = await fetch("/api/site-data?type=services", { cache: "no-store" });
+    if (!res.ok) return [];
+    const json = await res.json();
+    return json?.data?.services || json?.services || json?.data || [];
+  } catch (err) {
+    console.error("[data-fetcher] Error fetching services data:", err);
     return [];
   }
 }
 
 /**
- * Fetch Full Catalog with Zero-Delay Sync:
- * Queries Master Catalog for CURRENT_COMPANY_ID and CURRENT_WEBSITE_ID.
- * Authoritative: What SuperAdmin assigns or unassigns is reflected directly.
+ * Fetch Contact Data
  */
-export async function fetchFullCatalog(options = {}) {
-  const { forceFresh = false } = options;
-  const now = Date.now();
-
-  if (!forceFresh && lastCatalogData !== null && now - lastCatalogFetchTime < SSR_CACHE_TTL_MS) {
-    return lastCatalogData;
+export async function fetchContactData() {
+  if (typeof window === "undefined") {
+    const { getContactData } = await import("./db-server.js");
+    return await getContactData();
   }
 
-  if (inFlightCatalogPromise && !forceFresh) {
-    return inFlightCatalogPromise;
+  try {
+    const res = await fetch("/api/site-data?type=contact", { cache: "no-store" });
+    if (!res.ok) return [];
+    const json = await res.json();
+    return json?.data?.contactInfo || json?.contactInfo || json?.data || [];
+  } catch (err) {
+    console.error("[data-fetcher] Error fetching contact data:", err);
+    return [];
   }
-
-  const fetchPromise = (async () => {
-    try {
-      // Primary & Authoritative: Fetch from Master Company Catalog
-      const products = await fetchMasterCompanyCatalog(CURRENT_COMPANY_ID, CURRENT_WEBSITE_ID);
-
-      lastCatalogData = products;
-      lastCatalogFetchTime = Date.now();
-      return products;
-    } catch (err) {
-      console.error("[data-fetcher] Fatal error in fetchFullCatalog:", err);
-      return lastCatalogData || [];
-    } finally {
-      if (inFlightCatalogPromise === fetchPromise) {
-        inFlightCatalogPromise = null;
-      }
-    }
-  })();
-
-  if (!forceFresh) {
-    inFlightCatalogPromise = fetchPromise;
-  }
-
-  return fetchPromise;
 }
 
 /**
- * Cached helper functions for static page contents
+ * Fetch District Data
  */
-export async function fetchHomeData() {
-  return fetchDocCached(`websites/${CURRENT_WEBSITE_ID}/pages/home`);
+export async function fetchDistrictData(districtSlug) {
+  if (!districtSlug) return null;
+
+  if (typeof window === "undefined") {
+    const { getDistrictData } = await import("./db-server.js");
+    return await getDistrictData(districtSlug);
+  }
+
+  try {
+    const res = await fetch(`/api/site-data?type=district_${districtSlug}`, { cache: "no-store" });
+    if (!res.ok) return null;
+    const json = await res.json();
+    return json?.data || null;
+  } catch (err) {
+    console.error(`[data-fetcher] Error fetching district data for ${districtSlug}:`, err);
+    return null;
+  }
 }
 
-export async function fetchContactData() {
-  return fetchDocCached(`websites/${CURRENT_WEBSITE_ID}/pages/contact`);
+/**
+ * Fetch Districts List
+ */
+export async function fetchDistrictsList() {
+  if (typeof window === "undefined") {
+    const { getDistrictsList } = await import("./db-server.js");
+    return await getDistrictsList();
+  }
+
+  try {
+    const res = await fetch("/api/site-data?type=districts", { cache: "no-store" });
+    if (!res.ok) return [];
+    const json = await res.json();
+    return json?.data || [];
+  } catch (err) {
+    console.error("[data-fetcher] Error fetching districts list:", err);
+    return [];
+  }
 }
 
-export async function fetchServicesData() {
-  return fetchDocCached(`websites/${CURRENT_WEBSITE_ID}/pages/services`);
-}
+/**
+ * Polling subscription to catalog changes
+ */
+export function subscribeToCatalog(onUpdate, intervalMs = 5000) {
+  let active = true;
 
-export async function fetchDistrictData(district) {
-  if (!district) return null;
-  return fetchDocCached(`websites/${CURRENT_WEBSITE_ID}/districts/${district}`);
+  const poll = async () => {
+    if (!active) return;
+    try {
+      const catalog = await fetchFullCatalog();
+      if (active && onUpdate) {
+        onUpdate(catalog);
+      }
+    } catch (err) {
+      console.warn("[data-fetcher] Catalog subscription poll error:", err);
+    }
+  };
+
+  poll();
+  const timer = setInterval(poll, intervalMs);
+
+  return () => {
+    active = false;
+    clearInterval(timer);
+  };
 }

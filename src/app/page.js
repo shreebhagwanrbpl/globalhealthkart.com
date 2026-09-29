@@ -5,9 +5,7 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
 import { useEffect, useState } from "react";
-import { doc, getDoc } from "firebase/firestore";
-import { db } from "@/lib/firebase";
-import { fetchFullCatalog } from "@/lib/data-fetcher";
+import { fetchFullCatalog, fetchHomeData, fetchServicesData } from "@/lib/data-fetcher";
 
 import SectionTitle from "@/components/SectionTitle";
 import ServiceCard from "@/components/ServiceCard";
@@ -239,32 +237,25 @@ export default function HomePage() {
   ======================================================== */
 
   useEffect(() => {
+    let isMounted = true;
     const loadHero = async () => {
       try {
-        const snap = await getDoc(
-          doc(
-            db,
-            "websites",
-            "globalhealthkartcom",
-            "pages",
-            "home"
-          )
-        );
-
-        if (snap.exists()) {
-          setHeroData(snap.data());
+        const data = await fetchHomeData();
+        if (isMounted && data) {
+          setHeroData(data);
         }
       } catch (error) {
-        console.error(
-          "Hero data error:",
-          error
-        );
+        console.error("Hero data error:", error);
       } finally {
-        setLoading(false);
+        if (isMounted) setLoading(false);
       }
     };
 
     loadHero();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   /* ========================================================
@@ -272,33 +263,19 @@ export default function HomePage() {
   ======================================================== */
 
   useEffect(() => {
+    let isMounted = true;
     const loadHomeData = async () => {
       try {
         /* ------------------------------------------------
            SERVICES
         ------------------------------------------------ */
-
-        const serviceSnap = await getDoc(
-          doc(
-            db,
-            "websites",
-            "globalhealthkartcom",
-            "pages",
-            "services"
-          )
-        );
-
-        if (serviceSnap.exists()) {
-          const serviceData =
-            serviceSnap.data();
-
-          setServices(
-            Array.isArray(
-              serviceData.services
-            )
-              ? serviceData.services
-              : []
-          );
+        try {
+          const serviceData = await fetchServicesData();
+          if (isMounted && Array.isArray(serviceData)) {
+            setServices(serviceData);
+          }
+        } catch (sErr) {
+          console.error("Services fetch error:", sErr);
         }
 
         /* ------------------------------------------------
@@ -430,112 +407,93 @@ export default function HomePage() {
 
       <section className="relative overflow-hidden bg-white">
 
-        <div className="container-custom py-10 md:py-14 lg:py-16">
+        <div className="container-custom py-8 md:py-12 lg:py-14">
 
-          {/* TOP INTRO */}
+          {/* TOP CONTENT: TITLE, DESCRIPTION, BUTTONS */}
 
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }} className="text-center">
-
-            <div className="mx-auto mb-5 flex w-fit items-center gap-3 text-sm font-bold uppercase tracking-[0.2em] text-[#A45F35]">
-
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6 }}
+            className="mx-auto max-w-4xl text-center"
+          >
+            <div className="mx-auto mb-4 flex w-fit items-center gap-3 text-xs font-bold uppercase tracking-[0.2em] text-[#A45F35] sm:text-sm">
               <span className="h-2 w-2 rounded-full bg-[#A45F35]" />
-
               Biomedical & Diagnostic Solutions
-
               <span className="h-2 w-2 rounded-full bg-[#A45F35]" />
-
             </div>
 
+            {heroData?.title && (
+              <h1 className="text-3xl font-black leading-tight text-slate-900 sm:text-4xl lg:text-5xl">
+                {heroData.title}
+              </h1>
+            )}
 
+            {heroData?.description && (
+              <p className="mx-auto mt-4 max-w-2xl text-base leading-relaxed text-slate-600 sm:text-lg">
+                {heroData.description}
+              </p>
+            )}
+
+            {(heroData?.button1Text || heroData?.button2Text) && (
+              <div className="mt-6 flex flex-wrap items-center justify-center gap-4 sm:mt-7">
+                {heroData.button1Text && (
+                  <Link
+                    href={makeLink("/items")}
+                    className="group inline-flex items-center justify-center gap-2 rounded-xl bg-[#A45F35] px-7 py-3.5 font-semibold !text-white shadow-md transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#874723] hover:shadow-xl"
+                  >
+                    <span className="!text-white">
+                      {heroData.button1Text}
+                    </span>
+                    <ArrowRight
+                      size={18}
+                      className="!text-white transition-transform duration-300 group-hover:translate-x-1"
+                    />
+                  </Link>
+                )}
+
+                {heroData.button2Text && (
+                  <Link
+                    href={makeLink("/contact")}
+                    className="group inline-flex items-center justify-center gap-2 rounded-xl border-2 border-[#A45F35] bg-white px-7 py-3.5 font-semibold !text-[#A45F35] transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#A45F35] hover:!text-white hover:shadow-md"
+                  >
+                    <span className="!text-[#A45F35] group-hover:!text-white">
+                      {heroData.button2Text}
+                    </span>
+                  </Link>
+                )}
+              </div>
+            )}
           </motion.div>
 
 
           {/* ====================================================
-              MINIMAL CAROUSEL
-              IMAGE TOP + TEXT BOTTOM
+              HERO IMAGE & STATS SHOWCASE (BELOW CONTENT)
           ==================================================== */}
 
           <motion.div
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2, duration: 0.7 }}
-            className="relative mx-auto mt-10 max-w-6xl"
+            className="relative mx-auto mt-8 max-w-5xl sm:mt-10"
           >
-            <div className="overflow-hidden rounded-[28px] border border-[#E8C8B6] bg-white shadow-[0_20px_60px_rgba(164,95,53,0.10)]">
+            <div className="overflow-hidden rounded-[24px] border border-[#E8C8B6] bg-white shadow-[0_15px_45px_rgba(164,95,53,0.08)] sm:rounded-[28px]">
 
-              {/* IMAGE — TOP */}
-              <div className="relative flex min-h-[300px] items-center justify-center overflow-hidden bg-[#F8EEE8] sm:min-h-[390px] lg:min-h-[500px]">
+              {/* IMAGE SHOWCASE */}
+              <div className="relative flex min-h-[220px] items-center justify-center overflow-hidden bg-[#F8EEE8] p-4 sm:min-h-[300px] sm:p-6 lg:min-h-[380px]">
                 <Image
                   src="/home.png"
                   alt="Biomedical Equipment and Healthcare Solutions"
-                  width={1400}
-                  height={900}
+                  width={1200}
+                  height={700}
                   priority
-                  className="h-[280px] w-full object-contain px-5 transition-transform duration-700 hover:scale-[1.03] sm:h-[360px] sm:px-8 lg:h-[460px] lg:px-12"
+                  className="h-[200px] w-full object-contain transition-transform duration-700 hover:scale-[1.02] sm:h-[280px] lg:h-[350px]"
                 />
 
-                {/* Minimal carousel controls */}
-                <button
-                  type="button"
-                  aria-label="Previous slide"
-                  className="absolute left-4 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-[#E8C8B6] bg-white/90 text-[#A45F35] shadow-sm backdrop-blur-sm transition-all duration-300 hover:bg-[#A45F35] hover:text-white"
-                >
-                  <span className="text-xl leading-none">‹</span>
-                </button>
-
-                <button
-                  type="button"
-                  aria-label="Next slide"
-                  className="absolute right-4 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-[#E8C8B6] bg-white/90 text-[#A45F35] shadow-sm backdrop-blur-sm transition-all duration-300 hover:bg-[#A45F35] hover:text-white"
-                >
-                  <span className="text-xl leading-none">›</span>
-                </button>
-
-                <div className="absolute bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-white/90 px-3 py-2 shadow-sm">
+                <div className="absolute bottom-3 left-1/2 flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-white/90 px-3 py-1.5 shadow-sm">
                   <span className="h-2 w-6 rounded-full bg-[#A45F35]" />
                   <span className="h-2 w-2 rounded-full bg-[#E8C8B6]" />
                   <span className="h-2 w-2 rounded-full bg-[#E8C8B6]" />
-                </div>
-              </div>
-
-              {/* TEXT — BOTTOM */}
-              <div className="border-t border-[#E8C8B6] bg-white px-6 py-7 text-center sm:px-10 sm:py-8 lg:px-14">
-                <div className="mb-3 flex items-center justify-center gap-3 text-xs font-bold uppercase tracking-[0.2em] text-[#A45F35]">
-                  <span className="h-1.5 w-1.5 rounded-full bg-[#A45F35]" />
-                  Healthcare Technology
-                  <span className="h-1.5 w-1.5 rounded-full bg-[#A45F35]" />
-                </div>
-
-                <h2 className="mx-auto max-w-4xl text-2xl font-black leading-tight text-slate-900 sm:text-3xl lg:text-4xl">
-                  {heroData.title || "Advanced Biomedical Solutions For Modern Healthcare"}
-                </h2>
-
-                <p className="mx-auto mt-3 max-w-3xl text-sm leading-7 text-slate-600 sm:text-base">
-                  {heroData.description || "Reliable biomedical equipment, laboratory solutions and professional support for hospitals, laboratories and healthcare institutions."}
-                </p>
-
-                <div className="mt-5 flex flex-wrap justify-center gap-3">
-                  <Link
-                    href={makeLink("/items")}
-                    className="group inline-flex items-center justify-center gap-2 rounded-xl bg-[#A45F35] px-6 py-3 font-semibold !text-white shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#874723] hover:shadow-lg"
-                  >
-                    <span className="!text-white">
-                      {heroData.button1Text || "Explore Products"}
-                    </span>
-                    <ArrowRight
-                      size={17}
-                      className="!text-white transition-transform duration-300 group-hover:translate-x-0.5"
-                    />
-                  </Link>
-
-                  <Link
-                    href={makeLink("/contact")}
-                    className="group inline-flex items-center justify-center gap-2 rounded-xl border border-[#A45F35] bg-white px-6 py-3 font-semibold !text-[#A45F35] transition-all duration-300 hover:bg-[#A45F35] hover:!text-white"
-                  >
-                    <span className="!text-[#A45F35] group-hover:!text-white">
-                      {heroData.button2Text || "Contact Us"}
-                    </span>
-                  </Link>
                 </div>
               </div>
 
@@ -543,19 +501,19 @@ export default function HomePage() {
               <div className="grid border-t border-[#E8C8B6] bg-[#F8EEE8] sm:grid-cols-4">
                 <div className="border-b border-[#E8C8B6] px-5 py-4 text-center sm:border-b-0 sm:border-r">
                   <p className="text-2xl font-black text-[#A45F35]">5000+</p>
-                  <p className="mt-1 text-xs font-medium text-slate-500">Happy Clients</p>
+                  <p className="mt-1 text-xs font-medium text-slate-600">Happy Clients</p>
                 </div>
                 <div className="border-b border-[#E8C8B6] px-5 py-4 text-center sm:border-b-0 sm:border-r">
                   <p className="text-2xl font-black text-[#A45F35]">3500+</p>
-                  <p className="mt-1 text-xs font-medium text-slate-500">Products</p>
+                  <p className="mt-1 text-xs font-medium text-slate-600">Products</p>
                 </div>
                 <div className="border-b border-[#E8C8B6] px-5 py-4 text-center sm:border-b-0 sm:border-r">
                   <p className="text-2xl font-black text-[#A45F35]">10+</p>
-                  <p className="mt-1 text-xs font-medium text-slate-500">Years Experience</p>
+                  <p className="mt-1 text-xs font-medium text-slate-600">Years Experience</p>
                 </div>
                 <div className="px-5 py-4 text-center">
                   <p className="text-2xl font-black text-[#A45F35]">24/7</p>
-                  <p className="mt-1 text-xs font-medium text-slate-500">Customer Support</p>
+                  <p className="mt-1 text-xs font-medium text-slate-600">Customer Support</p>
                 </div>
               </div>
 

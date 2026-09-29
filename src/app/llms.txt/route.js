@@ -1,5 +1,6 @@
 import { fetchFullCatalog, fetchContactData } from "@/lib/data-fetcher";
 import { WEBSITE_CONFIG } from "@/lib/constants";
+import { parseContactInfo } from "@/lib/contact-parser";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -8,11 +9,12 @@ export const fetchCache = "force-no-store";
 export async function GET() {
   try {
     const products = await fetchFullCatalog({ forceFresh: true });
-    let contactInfo = null;
+    let contactInfo = [];
     try {
       contactInfo = await fetchContactData();
     } catch (_) { }
 
+    const { phones, emails, address } = parseContactInfo(contactInfo);
     const baseUrl = WEBSITE_CONFIG.baseUrl || "https://globalhealthkart.com";
     const companyName = WEBSITE_CONFIG.companyName || "Raj Biosis";
 
@@ -26,25 +28,20 @@ export async function GET() {
       grouped[cat][sub].push(p);
     });
 
-    let markdown = `# ${companyName} - Product Catalog (Raj Biosis)
-
-> Website: ${baseUrl}
-> Company: ${companyName}
-> Updated: ${new Date().toUTCString()}
-> Total Active Products: ${products.length}
-
-## Overview
-${companyName} is a premier supplier and distributor of high-quality diagnostic and biomedical equipment, medical instruments, reagents, and laboratory consumables across India.
-
-## Main Navigation
-- Home: ${baseUrl}
-- Products Catalog: ${baseUrl}/items
-- About Us: ${baseUrl}/about
-- Services: ${baseUrl}/services
-- Contact: ${baseUrl}/contact
-
-## Master Catalog Products
-`;
+    let markdown = `# ${companyName} - Product Catalog (Raj Biosis)\n\n`;
+    markdown += `> Website: ${baseUrl}\n`;
+    markdown += `> Company: ${companyName}\n`;
+    markdown += `> Updated: ${new Date().toUTCString()}\n`;
+    markdown += `> Total Active Products: ${products.length}\n\n`;
+    markdown += `## Overview\n`;
+    markdown += `${companyName} is a premier supplier and distributor of high-quality diagnostic and biomedical equipment, medical instruments, reagents, and laboratory consumables across India.\n\n`;
+    markdown += `## Main Navigation\n`;
+    markdown += `- Home: ${baseUrl}\n`;
+    markdown += `- Products Catalog: ${baseUrl}/items\n`;
+    markdown += `- About Us: ${baseUrl}/about\n`;
+    markdown += `- Services: ${baseUrl}/services\n`;
+    markdown += `- Contact: ${baseUrl}/contact\n\n`;
+    markdown += `## Master Catalog Products\n`;
 
     if (products.length === 0) {
       markdown += `\n*No products are currently visible or assigned for this website.*\n`;
@@ -73,13 +70,11 @@ ${companyName} is a premier supplier and distributor of high-quality diagnostic 
       }
     }
 
-    if (contactInfo) {
+    if (phones.length > 0 || emails.length > 0 || address) {
       markdown += `\n## Contact Information\n`;
-      if (Array.isArray(contactInfo.contactInfo)) {
-        contactInfo.contactInfo.forEach((item) => {
-          markdown += `- **${item.label || "Contact"}**: ${item.value}\n`;
-        });
-      }
+      if (phones.length > 0) markdown += `- **Phone Numbers:** ${phones.join(", ")}\n`;
+      if (emails.length > 0) markdown += `- **Email Addresses:** ${emails.join(", ")}\n`;
+      if (address) markdown += `- **Office Address:** ${address}\n`;
     }
 
     return new Response(markdown, {

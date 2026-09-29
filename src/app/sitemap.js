@@ -1,7 +1,5 @@
-import { db } from "@/lib/firebase";
-import { collection, getDocs } from "firebase/firestore";
-import { fetchFullCatalog } from "@/lib/data-fetcher";
-import { CURRENT_WEBSITE_ID, WEBSITE_CONFIG } from "@/lib/constants";
+import { fetchFullCatalogData, getDistrictsList } from "@/lib/db-server";
+import { WEBSITE_CONFIG } from "@/lib/constants";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -45,48 +43,45 @@ export default async function sitemap() {
   );
 
   try {
-    // 2. Districts
-    let districts = [];
-    try {
-      const districtSnap = await getDocs(
-        collection(db, "websites", CURRENT_WEBSITE_ID, "districts")
-      );
-      districts = districtSnap.docs.map((doc) => doc.data());
-    } catch (dErr) {
-      console.error("[sitemap] District fetch error:", dErr);
-    }
+    const [catalogData, districtsList] = await Promise.all([
+      fetchFullCatalogData().catch(() => ({ categoryProducts: [] })),
+      getDistrictsList().catch(() => []),
+    ]);
 
-    districts.forEach((district) => {
-      const slug = district.slug;
-      if (!slug) return;
+    const districts = Array.isArray(districtsList) ? districtsList : [];
+    const products = Array.isArray(catalogData?.categoryProducts) ? catalogData.categoryProducts : [];
+
+    // 2. District Pages
+    districts.forEach((districtSlug) => {
+      if (!districtSlug) return;
 
       urls.push(
         {
-          url: `${baseUrl}/${slug}`,
+          url: `${baseUrl}/${districtSlug}`,
           lastModified: new Date(),
           changeFrequency: "weekly",
           priority: 0.7,
         },
         {
-          url: `${baseUrl}/${slug}/about`,
+          url: `${baseUrl}/${districtSlug}/about`,
           lastModified: new Date(),
           changeFrequency: "monthly",
           priority: 0.6,
         },
         {
-          url: `${baseUrl}/${slug}/services`,
+          url: `${baseUrl}/${districtSlug}/services`,
           lastModified: new Date(),
           changeFrequency: "monthly",
           priority: 0.6,
         },
         {
-          url: `${baseUrl}/${slug}/contact`,
+          url: `${baseUrl}/${districtSlug}/contact`,
           lastModified: new Date(),
           changeFrequency: "monthly",
           priority: 0.6,
         },
         {
-          url: `${baseUrl}/${slug}/items`,
+          url: `${baseUrl}/${districtSlug}/items`,
           lastModified: new Date(),
           changeFrequency: "weekly",
           priority: 0.7,
@@ -94,9 +89,7 @@ export default async function sitemap() {
       );
     });
 
-    // 3. Products from Master Catalog (strictly filtered by visibility)
-    const products = await fetchFullCatalog({ forceFresh: true });
-
+    // 3. Products Pages
     products.forEach((product) => {
       if (!product.slug) return;
 
@@ -109,11 +102,11 @@ export default async function sitemap() {
       });
 
       // District Product URLs
-      districts.forEach((district) => {
-        if (!district.slug) return;
+      districts.forEach((districtSlug) => {
+        if (!districtSlug) return;
 
         urls.push({
-          url: `${baseUrl}/${district.slug}/items/${product.slug}`,
+          url: `${baseUrl}/${districtSlug}/items/${product.slug}`,
           lastModified: new Date(),
           changeFrequency: "weekly",
           priority: 0.7,

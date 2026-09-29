@@ -1,8 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { doc, getDoc } from "firebase/firestore";
-import { db } from "@/lib/firebase";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -11,7 +9,8 @@ import {
   MapPin,
 } from "lucide-react";
 import { FaFacebookF, FaInstagram } from "react-icons/fa";
-import { fetchFullCatalog } from "@/lib/data-fetcher";
+import { fetchFullCatalog, fetchContactData, fetchDistrictData } from "@/lib/data-fetcher";
+import { parseContactInfo } from "@/lib/contact-parser";
 
 export default function Footer() {
   const [contactInfo, setContactInfo] = useState([]);
@@ -40,115 +39,75 @@ export default function Footer() {
       : "";
 
   useEffect(() => {
-    const loadContact = async () => {
-      try {
-        const snap = await getDoc(
-          doc(
-            db,
-            "websites",
-            "globalhealthkartcom",
-            "pages",
-            "contact"
-          )
-        );
+    let isMounted = true;
 
-        if (snap.exists()) {
-          setContactInfo(
-            snap.data().contactInfo || []
-          );
+    const loadData = async () => {
+      try {
+        // 1. Contact info
+        try {
+          const contactRes = await fetchContactData();
+          if (isMounted && Array.isArray(contactRes)) {
+            setContactInfo(contactRes);
+          }
+        } catch (contactErr) {
+          console.error("Error loading footer contact:", contactErr);
         }
 
-        setLoading(false);
-      } catch (err) {
-        console.log(err);
-        setLoading(false);
+        // 2. Categories from active catalog
+        try {
+          const catalog = await fetchFullCatalog();
+          if (isMounted && Array.isArray(catalog)) {
+            const uniqueCategories = Array.from(
+              new Set(
+                catalog
+                  .map((item) => item.category)
+                  .filter(Boolean)
+              )
+            );
+            setCategories(uniqueCategories.slice(0, 7));
+          }
+        } catch (catErr) {
+          console.error("Error loading categories in footer:", catErr);
+        }
+      } finally {
+        if (isMounted) setLoading(false);
       }
     };
 
-    loadContact();
+    loadData();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   useEffect(() => {
+    let isMounted = true;
     const loadDistrict = async () => {
       if (!district) return;
 
       try {
-        const snap = await getDoc(
-          doc(
-            db,
-            "websites",
-            "globalhealthkartcom",
-            "districts",
-            district
-          )
-        );
-
-        if (snap.exists()) {
-          setDistrictData(snap.data());
+        const snap = await fetchDistrictData(district);
+        if (isMounted && snap) {
+          setDistrictData(snap);
         }
       } catch (err) {
-        console.log(err);
+        console.error("Error loading district in footer:", err);
       }
     };
 
     loadDistrict();
+
+    return () => {
+      isMounted = false;
+    };
   }, [district]);
 
-  useEffect(() => {
-    const loadCategories = async () => {
-      try {
-        const catalog = await fetchFullCatalog();
-
-        const uniqueCategories = Array.from(
-          new Set(
-            catalog
-              .map((item) => item.category)
-              .filter(Boolean)
-          )
-        );
-
-        setCategories(
-          uniqueCategories.slice(0, 7)
-        );
-      } catch (err) {
-        console.error(
-          "Error loading categories in footer:",
-          err
-        );
-      }
-    };
-
-    loadCategories();
-  }, []);
-
-  const phone =
-    contactInfo.find(
-      (x) => x.label === "Phone Number"
-    )?.value ||
-    "+91 9983123469\n+91 9983333489";
-
-  const email =
-    contactInfo.find(
-      (x) => x.label === "Email Address"
-    )?.value ||
-    "rajbiosis@yahoo.in";
-
-  const address =
-    contactInfo.find(
-      (x) => x.label === "Office Address"
-    )?.value ||
-    "F-4, 1st Floor, Plot No. 16, D-Block Tagor Nagar, on Ajmer-Delhi, 200 Feet Bypass Rd, Jaipur, Rajasthan 302021";
+  const { phones, emails, address: rawAddress } = parseContactInfo(contactInfo);
 
   const dynamicAddress = districtData
     ? `${districtData.district}, ${districtData.state}, India`
-    : address;
-
-  const phoneNumbers = phone
-    ? phone
-      .split(/[\n,]+/)
-      .map((num) => num.trim())
-      .filter(Boolean)
-    : [];
+    : rawAddress;
 
   const makeLink = (path) => {
     if (!district) return path;
@@ -167,53 +126,37 @@ export default function Footer() {
   if (loading) {
     return (
       <footer className="bg-white border-t border-[#F1DDD1]">
-
         <div className="container-custom py-14">
-
           <div className="grid lg:grid-cols-4 md:grid-cols-2 gap-10">
-
             {[...Array(4)].map((_, i) => (
               <div key={i}>
-
                 <div className="h-8 w-40 bg-[#F1DDD1] rounded animate-pulse mb-6" />
-
                 {[...Array(5)].map((_, j) => (
                   <div
                     key={j}
                     className="h-5 bg-[#F8EEE8] rounded animate-pulse mb-4"
                   />
                 ))}
-
               </div>
             ))}
-
           </div>
 
           <div className="border-t border-[#F1DDD1] mt-12 pt-6">
-
             <div className="h-5 w-72 bg-[#F1DDD1] rounded animate-pulse" />
-
           </div>
-
         </div>
-
       </footer>
     );
   }
 
   return (
     <footer className="bg-white border-t border-[#F1DDD1]">
-
       <div className="container-custom py-14">
-
         <div className="grid lg:grid-cols-4 md:grid-cols-2 gap-10">
-
           {/* =========================================
               BRAND
           ========================================= */}
-
           <div>
-
             <h2 className="text-2xl font-bold text-[#A45F35]">
               Raj
               <span className="text-slate-800">
@@ -229,9 +172,7 @@ export default function Footer() {
             </p>
 
             {/* Social Icons */}
-
             <div className="flex gap-3 mt-6">
-
               <a
                 href="https://www.facebook.com/rajbiosispvtltd/"
                 target="_blank"
@@ -279,24 +220,18 @@ export default function Footer() {
               >
                 <FaInstagram size={18} />
               </a>
-
             </div>
-
           </div>
-
 
           {/* =========================================
               QUICK LINKS
           ========================================= */}
-
           <div className="w-fit">
-
             <h3 className="text-lg font-semibold mb-5 text-slate-800">
               Quick Links
             </h3>
 
             <div className="flex w-fit flex-col gap-3 text-slate-500">
-
               <Link
                 href={makeLink("/")}
                 className="hover:text-[#A45F35] transition"
@@ -331,26 +266,19 @@ export default function Footer() {
               >
                 Contact
               </Link>
-
             </div>
-
           </div>
-
 
           {/* =========================================
               CATEGORIES
           ========================================= */}
-
           <div className="w-fit">
-
             <h3 className="text-lg font-semibold mb-5 text-slate-800">
               Our Categories
             </h3>
 
             <div className="flex w-fit flex-col gap-3 text-slate-500">
-
               {categories.map((cat) => (
-
                 <Link
                   key={cat}
                   href={makeLink(
@@ -367,129 +295,99 @@ export default function Footer() {
                 >
                   {cat}
                 </Link>
-
               ))}
-
-              {categories.length === 0 && (
-                <>
-                  <p>Diagnostic Equipment</p>
-                  <p>Laboratory Solutions</p>
-                  <p>Biomedical Instruments</p>
-                  <p>Maintenance Support</p>
-                </>
-              )}
-
             </div>
-
           </div>
-
 
           {/* =========================================
               CONTACT
           ========================================= */}
-
           <div>
-
             <h3 className="text-lg font-semibold mb-5 text-slate-800">
               Contact Info
             </h3>
 
             <div className="space-y-4 text-slate-500">
-
               {/* Address */}
-
-              <div className="flex items-start gap-3">
-
-                <div
-                  className="
-                    w-11
-                    h-11
-                    rounded-xl
-                    bg-[#F8EEE8]
-                    border
-                    border-[#F1DDD1]
-                    flex
-                    items-center
-                    justify-center
-                    flex-shrink-0
-                  "
-                >
-                  <MapPin
-                    size={21}
-                    className="text-[#A45F35]"
-                  />
-                </div>
-
-                <p className="leading-6 pt-1">
-                  {dynamicAddress}
-                </p>
-
-              </div>
-
-
-              {/* Phone */}
-
-              <div className="flex flex-col gap-2">
-
-                {phoneNumbers.map((num, i) => (
-
+              {dynamicAddress && (
+                <div className="flex items-start gap-3">
                   <div
-                    key={i}
-                    className="flex items-center gap-3"
+                    className="
+                      w-11
+                      h-11
+                      rounded-xl
+                      bg-[#F8EEE8]
+                      border
+                      border-[#F1DDD1]
+                      flex
+                      items-center
+                      justify-center
+                      flex-shrink-0
+                    "
                   >
-
-                    <Phone
-                      size={17}
-                      className="text-[#A45F35] flex-shrink-0"
+                    <MapPin
+                      size={21}
+                      className="text-[#A45F35]"
                     />
-
-                    <a
-                      href={`tel:${num}`}
-                      className="hover:text-[#A45F35] transition"
-                    >
-                      {num}
-                    </a>
-
                   </div>
 
-                ))}
+                  <p className="leading-6 pt-1">
+                    {dynamicAddress}
+                  </p>
+                </div>
+              )}
 
-              </div>
+              {/* Phone Numbers */}
+              {phones.length > 0 && (
+                <div className="flex flex-col gap-2">
+                  {phones.map((num, i) => (
+                    <div
+                      key={i}
+                      className="flex items-center gap-3"
+                    >
+                      <Phone
+                        size={17}
+                        className="text-[#A45F35] flex-shrink-0"
+                      />
 
+                      <a
+                        href={`tel:${String(num).replace(/\s+/g, "")}`}
+                        className="hover:text-[#A45F35] transition"
+                      >
+                        {num}
+                      </a>
+                    </div>
+                  ))}
+                </div>
+              )}
 
-              {/* Email */}
+              {/* Emails */}
+              {emails.length > 0 && (
+                <div className="flex flex-col gap-2">
+                  {emails.map((em, i) => (
+                    <div key={i} className="flex items-center gap-3">
+                      <Mail
+                        size={17}
+                        className="text-[#A45F35] flex-shrink-0"
+                      />
 
-              <div className="flex items-center gap-3">
-
-                <Mail
-                  size={17}
-                  className="text-[#A45F35]"
-                />
-
-                <p>
-
-                  <a
-                    href={`mailto:${email}`}
-                    className="hover:text-[#A45F35] transition"
-                  >
-                    {email}
-                  </a>
-
-                </p>
-
-              </div>
-
+                      <a
+                        href={`mailto:${em}`}
+                        className="hover:text-[#A45F35] transition break-all"
+                      >
+                        {em}
+                      </a>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
-
           </div>
-
         </div>
-
 
         {/* =========================================
             BOTTOM
         ========================================= */}
-
         <div
           className="
             border-t
@@ -505,7 +403,6 @@ export default function Footer() {
             text-slate-500
           "
         >
-
           <p>
             © 2026 Raj Biosis.
             All rights reserved.
@@ -515,11 +412,8 @@ export default function Footer() {
             Designed with precision for
             modern diagnostics.
           </p>
-
         </div>
-
       </div>
-
     </footer>
   );
 }

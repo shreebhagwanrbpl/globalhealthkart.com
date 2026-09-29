@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { fetchFullCatalog } from "@/lib/data-fetcher";
+import { fetchFullCatalogData } from "@/lib/db-server";
 import { CURRENT_COMPANY_ID, CURRENT_WEBSITE_ID } from "@/lib/constants";
 
 export const dynamic = "force-dynamic";
@@ -8,13 +8,16 @@ export const fetchCache = "force-no-store";
 
 export async function GET() {
   try {
-    const products = await fetchFullCatalog({ forceFresh: true });
+    const data = await fetchFullCatalogData();
+    const products = data?.categoryProducts || data?.products || [];
 
     return NextResponse.json(
       {
         success: true,
         count: products.length,
-        products: products || [],
+        products: products,
+        categoryProducts: products,
+        categoryList: data?.categoryList || [],
         companyId: CURRENT_COMPANY_ID,
         websiteId: CURRENT_WEBSITE_ID,
         timestamp: Date.now(),
@@ -36,6 +39,8 @@ export async function GET() {
         success: false,
         count: 0,
         products: [],
+        categoryProducts: [],
+        categoryList: [],
         error: error.message || "Failed to fetch catalog",
         timestamp: Date.now(),
       },

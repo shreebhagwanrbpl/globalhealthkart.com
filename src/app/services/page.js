@@ -20,8 +20,7 @@ import SectionTitle from "@/components/SectionTitle";
 import ServiceCard from "@/components/ServiceCard";
 
 import { useEffect, useState } from "react";
-import { doc, getDoc } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { fetchServicesData } from "@/lib/data-fetcher";
 
 export default function ServicesPage() {
   const [services, setServices] = useState([]);
@@ -132,35 +131,27 @@ export default function ServicesPage() {
   ];
 
   useEffect(() => {
+    let isMounted = true;
     const fetchServices = async () => {
       try {
-        const snap = await getDoc(
-          doc(
-            db,
-            "websites",
-            "globalhealthkartcom",
-            "pages",
-            "services"
-          )
-        );
-
-        if (snap.exists()) {
-          const data = snap.data();
-
-          setServices(
-            Array.isArray(data.services)
-              ? data.services
-              : []
-          );
+        const data = await fetchServicesData();
+        if (isMounted && Array.isArray(data)) {
+          setServices(data);
         }
       } catch (error) {
         console.error("Services fetch error:", error);
       } finally {
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     };
 
     fetchServices();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   return (

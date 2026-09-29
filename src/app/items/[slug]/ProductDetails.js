@@ -14,15 +14,8 @@ import {
     FaLink,
 } from "react-icons/fa";
 
-import {
-    doc,
-    getDoc,
-    addDoc,
-    collection,
-} from "firebase/firestore";
-
-import { db } from "@/lib/firebase";
-import { fetchFullCatalog } from "@/lib/data-fetcher";
+import { fetchFullCatalog, fetchContactData } from "@/lib/data-fetcher";
+import { parseContactInfo } from "@/lib/contact-parser";
 import { Download } from "lucide-react";
 
 
@@ -63,12 +56,7 @@ export default function ProductDetails({ slug }) {
     const [downloading, setDownloading] = useState(false);
     const [brochureImage, setBrochureImage] = useState("");
 
-    const [contactData, setContactData] = useState({
-        phone: "+91 9983123469\n+91 9983333489",
-        email: "rajbiosis@yahoo.in",
-        address:
-            "F-4, 1st Floor, Plot No. 16, D-Block Tagor Nagar, on Ajmer-Delhi, 200 Feet Bypass Rd, Jaipur, Rajasthan 302021",
-    });
+    const [contactInfo, setContactInfo] = useState([]);
 
     const pathname = usePathname();
 
@@ -162,71 +150,17 @@ export default function ProductDetails({ slug }) {
 
 
         const loadContact = async () => {
-
             try {
-
-                const snap = await getDoc(
-                    doc(
-                        db,
-                        "websites",
-                        "globalhealthkartcom",
-                        "pages",
-                        "contact"
-                    )
-                );
-
-                if (snap.exists()) {
-
-                    const info =
-                        snap.data().contactInfo ||
-                        [];
-
-                    const phoneVal =
-                        info.find(
-                            (x) =>
-                                x.label ===
-                                "Phone Number"
-                        )?.value || "";
-
-                    const emailVal =
-                        info.find(
-                            (x) =>
-                                x.label ===
-                                "Email Address"
-                        )?.value || "";
-
-                    const addressVal =
-                        info.find(
-                            (x) =>
-                                x.label ===
-                                "Office Address"
-                        )?.value || "";
-
-                    setContactData({
-                        phone:
-                            phoneVal ||
-                            "+91 9983123469\n+91 9983333489",
-
-                        email:
-                            emailVal ||
-                            "rajbiosis@yahoo.in",
-
-                        address:
-                            addressVal ||
-                            "F-4, 1st Floor, Plot No. 16, D-Block Tagor Nagar, on Ajmer-Delhi, 200 Feet Bypass Rd, Jaipur, Rajasthan 302021",
-                    });
-
+                const info = await fetchContactData();
+                if (Array.isArray(info)) {
+                    setContactInfo(info);
                 }
-
             } catch (err) {
-
                 console.error(
                     "Error loading contact details:",
                     err
                 );
-
             }
-
         };
 
 
@@ -523,65 +457,46 @@ export default function ProductDetails({ slug }) {
 
 
             try {
-
                 setSubmitting(true);
 
+                const response = await fetch("/api/product-query", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        Accept: "application/json",
+                    },
+                    body: JSON.stringify({
+                        name: form.name.trim(),
+                        email: form.email.trim(),
+                        phone: form.phone.trim(),
+                        productName: product?.title || "",
+                        productSlug: product?.slug || slug || "",
+                        brand: product?.brand || "",
+                        model: product?.model || "",
+                    }),
+                });
 
-                await addDoc(
-                    collection(
-                        db,
-                        "websitesQueries",
-                        "globalhealthkartcom",
-                        "productQueries"
-                    ),
-                    {
-                        ...form,
-
-                        productName:
-                            product.title,
-
-                        productSlug:
-                            product.slug,
-
-                        brand:
-                            product.brand ||
-                            "",
-
-                        model:
-                            product.model ||
-                            "",
-
-                        createdAt:
-                            new Date(),
-                    }
-                );
-
+                if (!response.ok) {
+                    throw new Error(`Server returned status ${response.status}`);
+                }
 
                 toast.success(
                     "Your enquiry has been submitted successfully."
                 );
-
 
                 setForm({
                     name: "",
                     email: "",
                     phone: "",
                 });
-
             } catch (error) {
-
-                console.error(error);
-
+                console.error("Product query error:", error);
                 toast.error(
-                    "Something went wrong"
+                    "Failed to submit enquiry. Please try again."
                 );
-
             } finally {
-
                 setSubmitting(false);
-
             }
-
         };
 
 
@@ -691,24 +606,20 @@ export default function ProductDetails({ slug }) {
         };
 
 
-    const handleWhatsapp =
-        () => {
+    const handleWhatsapp = () => {
+        const { whatsappPhone } = parseContactInfo(contactInfo);
+        const shareText = `🔬 ${product?.title}
 
-            const shareText =
-                `🔬 ${product?.title}
-
-${product?.desc}
+${product?.desc || product?.description || ""}
 
 🌐 ${window.location.href}`;
 
-            window.open(
-                `https://wa.me/?text=${encodeURIComponent(
-                    shareText
-                )}`,
-                "_blank"
-            );
+        const waUrl = whatsappPhone
+            ? `https://wa.me/${whatsappPhone}?text=${encodeURIComponent(shareText)}`
+            : `https://wa.me/?text=${encodeURIComponent(shareText)}`;
 
-        };
+        window.open(waUrl, "_blank");
+    };
 
 
     const handleFacebook =
@@ -2429,7 +2340,6 @@ ${product?.desc}
                                 "#765A4C",
                         }}
                     >
-
                         <p
                             style={{
                                 margin:
@@ -2445,17 +2355,16 @@ ${product?.desc}
                             www.globalhealthkart.com
                         </p>
 
-                        <p
-                            style={{
-                                margin:
-                                    "0",
-                            }}
-                        >
-                            Email:{" "}
-                            {
-                                contactData.email
-                            }
-                        </p>
+                        {parseContactInfo(contactInfo).emails.length > 0 && (
+                            <p
+                                style={{
+                                    margin:
+                                        "0",
+                                }}
+                            >
+                                Email: {parseContactInfo(contactInfo).emails[0]}
+                            </p>
+                        )}
 
                         <div
                             style={{
@@ -2463,35 +2372,18 @@ ${product?.desc}
                                     "0",
                             }}
                         >
-
-                            {contactData.phone
-                                .split(
-                                    /[\n,]+/
-                                )
-                                .map(
-                                    (
-                                        num,
-                                        i
-                                    ) => (
-
-                                        <span
-                                            key={
-                                                i
-                                            }
-                                            style={{
-                                                display:
-                                                    "block",
-                                            }}
-                                        >
-                                            Mob:{" "}
-                                            {num.trim()}
-                                        </span>
-
-                                    )
-                                )}
-
+                            {parseContactInfo(contactInfo).phones.map((num, i) => (
+                                <span
+                                    key={i}
+                                    style={{
+                                        display:
+                                            "block",
+                                    }}
+                                >
+                                    Mob: {num}
+                                </span>
+                            ))}
                         </div>
-
                     </div>
 
                 </div>
@@ -3007,20 +2899,18 @@ ${product?.desc}
                             "1.5",
                     }}
                 >
-
-                    <p
-                        style={{
-                            margin:
-                                "0",
-                            fontWeight:
-                                "600",
-                        }}
-                    >
-                        Office Address:{" "}
-                        {
-                            contactData.address
-                        }
-                    </p>
+                    {parseContactInfo(contactInfo).address && (
+                        <p
+                            style={{
+                                margin:
+                                    "0",
+                                fontWeight:
+                                    "600",
+                            }}
+                        >
+                            Office Address: {parseContactInfo(contactInfo).address}
+                        </p>
+                    )}
 
                     <p
                         style={{
@@ -3030,7 +2920,6 @@ ${product?.desc}
                     >
                         © 2026 Raj Biosis. All rights reserved. Premium diagnostics and biomedical solutions.
                     </p>
-
                 </div>
 
             </div>
