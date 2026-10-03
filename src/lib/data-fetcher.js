@@ -14,11 +14,8 @@ export const isVisibleOnWebsite = isItemVisibleOnWebsite;
 let clientCatalogCache = null;
 let clientCatalogPromise = null;
 let lastCatalogFetch = 0;
-const CLIENT_CACHE_TTL = 15000; // 15 seconds
+const CLIENT_CACHE_TTL = 15000;
 
-/**
- * Fetch full catalog for client or server components
- */
 export async function fetchFullCatalog(options = {}) {
   if (typeof window === "undefined") {
     const { fetchFullCatalog: fetchServerCatalog } = await import("./db-server.js");
@@ -29,13 +26,10 @@ export async function fetchFullCatalog(options = {}) {
   return data?.categoryProducts || data?.products || [];
 }
 
-/**
- * Fetch catalog data with categories hierarchy
- */
 export async function fetchFullCatalogData() {
   if (typeof window === "undefined") {
-    const { fetchFullCatalogData: fetchServerCatalog } = await import("./db-server.js");
-    return await fetchServerCatalog();
+    const { fetchFullCatalogData: fetchServerData } = await import("./db-server.js");
+    return await fetchServerData();
   }
 
   const now = Date.now();
@@ -51,7 +45,7 @@ export async function fetchFullCatalogData() {
     try {
       const res = await fetch("/api/catalog", { cache: "no-store" });
       if (!res.ok) {
-        throw new Error(`Failed to fetch catalog: ${res.status}`);
+        throw new Error("Failed to fetch catalog: " + res.status);
       }
       const data = await res.json();
       clientCatalogCache = data;
@@ -90,9 +84,6 @@ export async function getProductBySlug(slug) {
   );
 }
 
-/**
- * Fetch Home Page Data
- */
 export async function fetchHomeData() {
   if (typeof window === "undefined") {
     const { getHomeData } = await import("./db-server.js");
@@ -103,16 +94,13 @@ export async function fetchHomeData() {
     const res = await fetch("/api/site-data?type=home", { cache: "no-store" });
     if (!res.ok) return null;
     const json = await res.json();
-    return json?.data || json || null;
+    return json?.data?.pages?.home || json?.data || json || null;
   } catch (err) {
     console.error("[data-fetcher] Error fetching home data:", err);
     return null;
   }
 }
 
-/**
- * Fetch Services Data
- */
 export async function fetchServicesData() {
   if (typeof window === "undefined") {
     const { getServicesData } = await import("./db-server.js");
@@ -123,16 +111,13 @@ export async function fetchServicesData() {
     const res = await fetch("/api/site-data?type=services", { cache: "no-store" });
     if (!res.ok) return [];
     const json = await res.json();
-    return json?.data?.services || json?.services || json?.data || [];
+    return json?.data?.pages?.services?.services || json?.data?.services || json?.services || [];
   } catch (err) {
     console.error("[data-fetcher] Error fetching services data:", err);
     return [];
   }
 }
 
-/**
- * Fetch Contact Data
- */
 export async function fetchContactData() {
   if (typeof window === "undefined") {
     const { getContactData } = await import("./db-server.js");
@@ -143,16 +128,13 @@ export async function fetchContactData() {
     const res = await fetch("/api/site-data?type=contact", { cache: "no-store" });
     if (!res.ok) return [];
     const json = await res.json();
-    return json?.data?.contactInfo || json?.contactInfo || json?.data || [];
+    return json?.data?.pages?.contact?.contactInfo || json?.data?.contactInfo || json?.contactInfo || [];
   } catch (err) {
     console.error("[data-fetcher] Error fetching contact data:", err);
     return [];
   }
 }
 
-/**
- * Fetch District Data
- */
 export async function fetchDistrictData(districtSlug) {
   if (!districtSlug) return null;
 
@@ -162,19 +144,16 @@ export async function fetchDistrictData(districtSlug) {
   }
 
   try {
-    const res = await fetch(`/api/site-data?type=district_${districtSlug}`, { cache: "no-store" });
+    const res = await fetch("/api/site-data?type=district_" + districtSlug, { cache: "no-store" });
     if (!res.ok) return null;
     const json = await res.json();
     return json?.data || null;
   } catch (err) {
-    console.error(`[data-fetcher] Error fetching district data for ${districtSlug}:`, err);
+    console.error("[data-fetcher] Error fetching district data:", err);
     return null;
   }
 }
 
-/**
- * Fetch Districts List
- */
 export async function fetchDistrictsList() {
   if (typeof window === "undefined") {
     const { getDistrictsList } = await import("./db-server.js");
@@ -190,31 +169,4 @@ export async function fetchDistrictsList() {
     console.error("[data-fetcher] Error fetching districts list:", err);
     return [];
   }
-}
-
-/**
- * Polling subscription to catalog changes
- */
-export function subscribeToCatalog(onUpdate, intervalMs = 5000) {
-  let active = true;
-
-  const poll = async () => {
-    if (!active) return;
-    try {
-      const catalog = await fetchFullCatalog();
-      if (active && onUpdate) {
-        onUpdate(catalog);
-      }
-    } catch (err) {
-      console.warn("[data-fetcher] Catalog subscription poll error:", err);
-    }
-  };
-
-  poll();
-  const timer = setInterval(poll, intervalMs);
-
-  return () => {
-    active = false;
-    clearInterval(timer);
-  };
 }
