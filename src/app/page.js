@@ -497,27 +497,7 @@ export default function HomePage() {
                 </div>
               </div>
 
-              {/* STATS */}
-              <div className="grid border-t border-[#E8C8B6] bg-[#F8EEE8] sm:grid-cols-4">
-                <div className="border-b border-[#E8C8B6] px-5 py-4 text-center sm:border-b-0 sm:border-r">
-                  <p className="text-2xl font-black text-[#A45F35]">5000+</p>
-                  <p className="mt-1 text-xs font-medium text-slate-600">Happy Clients</p>
-                </div>
-                <div className="border-b border-[#E8C8B6] px-5 py-4 text-center sm:border-b-0 sm:border-r">
-                  <p className="text-2xl font-black text-[#A45F35]">3500+</p>
-                  <p className="mt-1 text-xs font-medium text-slate-600">Products</p>
-                </div>
-                <div className="border-b border-[#E8C8B6] px-5 py-4 text-center sm:border-b-0 sm:border-r">
-                  <p className="text-2xl font-black text-[#A45F35]">10+</p>
-                  <p className="mt-1 text-xs font-medium text-slate-600">Years Experience</p>
-                </div>
-                <div className="px-5 py-4 text-center">
-                  <p className="text-2xl font-black text-[#A45F35]">24/7</p>
-                  <p className="mt-1 text-xs font-medium text-slate-600">Customer Support</p>
-                </div>
               </div>
-
-            </div>
           </motion.div>
 
         </div>

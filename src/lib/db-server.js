@@ -10,11 +10,6 @@ import {
   normalizeSlug,
 } from "./catalog-utils.js";
 import {
-  fetchCatalogDataFromSqlite,
-  fetchSiteDataFromSqlite,
-  isSqliteAvailable,
-} from "./sqliteDb.js";
-import {
   fetchCatalogFromAdmin,
   fetchSiteDataFromAdmin,
 } from "./admin-api.js";
@@ -30,24 +25,14 @@ export {
   normalizeSlug,
 };
 
-// Aliases for compatibility
 export const normalizeSiteId = normalizeDomainId;
 export const isVisibleOnWebsite = isItemVisibleOnWebsite;
 
 /**
- * Fetch and process full catalog data from local SQLite DB (Instant <2ms) with Admin API fallback
+ * Fetch and process full catalog data from SuperAdmin MongoDB API
  */
 export const fetchFullCatalogData = cache(async (websiteId = WEBSITE_ID) => {
   try {
-    // 1. Direct local SQLite Read (<2ms)
-    if (isSqliteAvailable()) {
-      const sqliteResult = fetchCatalogDataFromSqlite(websiteId);
-      if (sqliteResult && (sqliteResult.products?.length > 0 || sqliteResult.categoryList?.length > 0)) {
-        return sqliteResult;
-      }
-    }
-
-    // 2. Admin API fallback if SQLite is not available or empty
     const rawResult = await fetchCatalogFromAdmin(websiteId);
     const categoryProducts = [];
     const categoryList = [];
@@ -134,17 +119,11 @@ export const fetchFullCatalogData = cache(async (websiteId = WEBSITE_ID) => {
   }
 });
 
-/**
- * Fetch full flat catalog of visible products
- */
 export async function fetchFullCatalog(options = {}) {
   const data = await fetchFullCatalogData();
   return data?.categoryProducts || [];
 }
 
-/**
- * Fetch categories hierarchy
- */
 export async function getCategoriesData() {
   const data = await fetchFullCatalogData();
   return {
@@ -153,9 +132,6 @@ export async function getCategoriesData() {
   };
 }
 
-/**
- * Get product by slug
- */
 export async function getProductBySlug(slug) {
   if (!slug) return null;
   const products = await fetchFullCatalog();
@@ -170,16 +146,8 @@ export async function getProductBySlug(slug) {
   );
 }
 
-/**
- * Fetch Home page data from SQLite with Admin API fallback
- */
 export async function getHomeData(websiteId = WEBSITE_ID) {
   try {
-    if (isSqliteAvailable()) {
-      const sqliteData = fetchSiteDataFromSqlite("home", websiteId);
-      if (sqliteData) return sqliteData;
-    }
-
     const res = await fetchSiteDataFromAdmin(websiteId, "home");
     if (res?.success && res.data) {
       return res.data;
@@ -191,18 +159,8 @@ export async function getHomeData(websiteId = WEBSITE_ID) {
   }
 }
 
-/**
- * Fetch Services page data from SQLite with Admin API fallback
- */
 export async function getServicesData(websiteId = WEBSITE_ID) {
   try {
-    if (isSqliteAvailable()) {
-      const sqliteData = fetchSiteDataFromSqlite("services", websiteId);
-      if (sqliteData) {
-        return sqliteData.services || sqliteData;
-      }
-    }
-
     const res = await fetchSiteDataFromAdmin(websiteId, "services");
     if (res?.success && res.data) {
       return res.data.services || res.data || [];
@@ -217,18 +175,8 @@ export async function getServicesData(websiteId = WEBSITE_ID) {
   }
 }
 
-/**
- * Fetch Contact page data from SQLite with Admin API fallback
- */
 export async function getContactData(websiteId = WEBSITE_ID) {
   try {
-    if (isSqliteAvailable()) {
-      const sqliteData = fetchSiteDataFromSqlite("contact", websiteId);
-      if (sqliteData) {
-        return sqliteData.contactInfo || sqliteData;
-      }
-    }
-
     const res = await fetchSiteDataFromAdmin(websiteId, "contact");
     if (res?.success && res.data) {
       return res.data.contactInfo || res.data || [];
@@ -246,17 +194,9 @@ export async function getContactData(websiteId = WEBSITE_ID) {
   }
 }
 
-/**
- * Fetch District data from SQLite with Admin API fallback
- */
 export async function getDistrictData(districtSlug, websiteId = WEBSITE_ID) {
   if (!districtSlug) return null;
   try {
-    if (isSqliteAvailable()) {
-      const sqliteData = fetchSiteDataFromSqlite(`district_${districtSlug}`, websiteId);
-      if (sqliteData) return sqliteData;
-    }
-
     const res = await fetchSiteDataFromAdmin(websiteId, `district_${districtSlug}`);
     if (res?.success && res.data) {
       return res.data;
@@ -268,21 +208,8 @@ export async function getDistrictData(districtSlug, websiteId = WEBSITE_ID) {
   }
 }
 
-/**
- * Fetch Districts list from SQLite with Admin API fallback
- */
 export async function getDistrictsList(websiteId = WEBSITE_ID) {
   try {
-    if (isSqliteAvailable()) {
-      const sqliteData = fetchSiteDataFromSqlite("districts", websiteId);
-      if (sqliteData) {
-        const list = sqliteData.districts || sqliteData.data || sqliteData;
-        if (Array.isArray(list)) {
-          return list.map((d) => d.slug || d.id || d).filter(Boolean);
-        }
-      }
-    }
-
     const res = await fetchSiteDataFromAdmin(websiteId, "districts");
     if (res?.success && Array.isArray(res.data)) {
       return res.data.map((d) => d.slug || d.id || d).filter(Boolean);
