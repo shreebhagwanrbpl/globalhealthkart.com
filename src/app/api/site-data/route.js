@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { WEBSITE_ID } from "@/lib/catalog-utils";
-import { fetchSiteDataFromSqlite, isSqliteAvailable } from "@/lib/sqliteDb";
 import { fetchSiteDataFromAdmin } from "@/lib/admin-api";
 
 export const dynamic = "force-dynamic";
@@ -13,16 +12,8 @@ export async function GET(req) {
     const websiteId = searchParams.get("websiteId") || WEBSITE_ID;
     const type = searchParams.get("type") || "all";
 
-    let data = null;
-
-    if (isSqliteAvailable()) {
-      data = fetchSiteDataFromSqlite(type, websiteId);
-    }
-
-    if (!data) {
-      const adminRes = await fetchSiteDataFromAdmin(websiteId, type);
-      data = adminRes?.data || adminRes || null;
-    }
+    const adminRes = await fetchSiteDataFromAdmin(websiteId, type);
+    const data = adminRes?.data || adminRes || null;
 
     return NextResponse.json(
       {
