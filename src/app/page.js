@@ -9,6 +9,7 @@ import { fetchFullCatalog, fetchHomeData, fetchServicesData } from "@/lib/data-f
 
 import SectionTitle from "@/components/SectionTitle";
 import ServiceCard from "@/components/ServiceCard";
+import HeroCarousel from "@/components/HeroCarousel";
 
 import {
   Microscope,
@@ -402,107 +403,9 @@ export default function HomePage() {
   return (
     <>
       {/* ====================================================
-          HERO
+          HERO CAROUSEL (TEXT OVER IMAGE)
       ==================================================== */}
-
-      <section className="relative overflow-hidden bg-white">
-
-        <div className="container-custom py-8 md:py-12 lg:py-14">
-
-          {/* TOP CONTENT: TITLE, DESCRIPTION, BUTTONS */}
-
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
-            className="mx-auto max-w-4xl text-center"
-          >
-            <div className="mx-auto mb-4 flex w-fit items-center gap-3 text-xs font-bold uppercase tracking-[0.2em] text-[#A45F35] sm:text-sm">
-              <span className="h-2 w-2 rounded-full bg-[#A45F35]" />
-              Biomedical & Diagnostic Solutions
-              <span className="h-2 w-2 rounded-full bg-[#A45F35]" />
-            </div>
-
-            {heroData?.title && (
-              <h1 className="text-3xl font-black leading-tight text-slate-900 sm:text-4xl lg:text-5xl">
-                {heroData.title}
-              </h1>
-            )}
-
-            {heroData?.description && (
-              <p className="mx-auto mt-4 max-w-2xl text-base leading-relaxed text-slate-600 sm:text-lg">
-                {heroData.description}
-              </p>
-            )}
-
-            {(heroData?.button1Text || heroData?.button2Text) && (
-              <div className="mt-6 flex flex-wrap items-center justify-center gap-4 sm:mt-7">
-                {heroData.button1Text && (
-                  <Link
-                    href={makeLink("/items")}
-                    className="group inline-flex items-center justify-center gap-2 rounded-xl bg-[#A45F35] px-7 py-3.5 font-semibold !text-white shadow-md transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#874723] hover:shadow-xl"
-                  >
-                    <span className="!text-white">
-                      {heroData.button1Text}
-                    </span>
-                    <ArrowRight
-                      size={18}
-                      className="!text-white transition-transform duration-300 group-hover:translate-x-1"
-                    />
-                  </Link>
-                )}
-
-                {heroData.button2Text && (
-                  <Link
-                    href={makeLink("/contact")}
-                    className="group inline-flex items-center justify-center gap-2 rounded-xl border-2 border-[#A45F35] bg-white px-7 py-3.5 font-semibold !text-[#A45F35] transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#A45F35] hover:!text-white hover:shadow-md"
-                  >
-                    <span className="!text-[#A45F35] group-hover:!text-white">
-                      {heroData.button2Text}
-                    </span>
-                  </Link>
-                )}
-              </div>
-            )}
-          </motion.div>
-
-
-          {/* ====================================================
-              HERO IMAGE & STATS SHOWCASE (BELOW CONTENT)
-          ==================================================== */}
-
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2, duration: 0.7 }}
-            className="relative mx-auto mt-8 max-w-5xl sm:mt-10"
-          >
-            <div className="overflow-hidden rounded-[24px] border border-[#E8C8B6] bg-white shadow-[0_15px_45px_rgba(164,95,53,0.08)] sm:rounded-[28px]">
-
-              {/* IMAGE SHOWCASE */}
-              <div className="relative flex min-h-[220px] items-center justify-center overflow-hidden bg-[#F8EEE8] p-4 sm:min-h-[300px] sm:p-6 lg:min-h-[380px]">
-                <Image
-                  src="/home.png"
-                  alt="Biomedical Equipment and Healthcare Solutions"
-                  width={1200}
-                  height={700}
-                  priority
-                  className="h-[200px] w-full object-contain transition-transform duration-700 hover:scale-[1.02] sm:h-[280px] lg:h-[350px]"
-                />
-
-                <div className="absolute bottom-3 left-1/2 flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-white/90 px-3 py-1.5 shadow-sm">
-                  <span className="h-2 w-6 rounded-full bg-[#A45F35]" />
-                  <span className="h-2 w-2 rounded-full bg-[#E8C8B6]" />
-                  <span className="h-2 w-2 rounded-full bg-[#E8C8B6]" />
-                </div>
-              </div>
-
-              </div>
-          </motion.div>
-
-        </div>
-
-      </section>
+      <HeroCarousel heroData={heroData} makeLink={makeLink} />
 
 
       {/* ====================================================
